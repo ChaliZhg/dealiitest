@@ -47,7 +47,6 @@ namespace Test
     void setup_system (const bool initial_step);
     void assemble_system ();
     void solve ();
-    void refine_mesh ();
     void set_boundary_values ();
     double compute_residual (const double alpha) const;
     double determine_step_length () const;
@@ -74,6 +73,24 @@ namespace Test
                                      const unsigned int /*component*/) const
   {
     return std::sin(2 * numbers::PI * (p[0]+p[1]));
+  }
+    // set right hand side function
+  template <int dim>
+  class RightHandSide : public Function<dim>
+  {
+  public:
+    RightHandSide () : Function<dim>() {}
+
+    virtual double value (const Point<dim>   &p,
+                          const unsigned int  component = 0) const;
+  };
+
+
+  template <int dim>
+  double RightHandSide<dim>::value (const Point<dim> &p,
+                                     const unsigned int /*component*/) const
+  {
+    return (p[0]+p[1])*(p[0]+p[1]);
   }
   template <int dim>
   MinimalSurfaceProblem<dim>::MinimalSurfaceProblem ()
@@ -185,44 +202,32 @@ namespace Test
   template <int dim>
   void MinimalSurfaceProblem<dim>::solve ()
   {
-    SolverControl solver_control (system_rhs.size(),
-                                  system_rhs.l2_norm()*1e-6);
-    SolverCG<>    solver (solver_control);
+    //solver 1 CG
+    // SolverControl solver_control (system_rhs.size(),
+    //                               system_rhs.l2_norm()*1e-6);
+    // SolverCG<>    solver (solver_control);
+    // PreconditionSSOR<> preconditioner;
+    // preconditioner.initialize(system_matrix, 1.2);
+    // solver.solve (system_matrix, newton_update, system_rhs,
+    //               preconditioner);
+
+    //solver 2 Direct LU
+    // SparseDirectUMFPACK  A_direct;
+    // A_direct.initialize(system_matrix);
+    // A_direct.vmult (newton_update, system_rhs);
+
+    //solver 3 Gmres
+    SolverControl solver_control (100000,
+                                   1e-6);
+    SolverGMRES<Vector<double> > solver (solver_control);
     PreconditionSSOR<> preconditioner;
     preconditioner.initialize(system_matrix, 1.2);
-    solver.solve (system_matrix, newton_update, system_rhs,
-                  preconditioner);
+    solver.solve (system_matrix, newton_update, system_rhs, preconditioner);
+
+
     hanging_node_constraints.distribute (newton_update);
     const double alpha = determine_step_length();
     present_solution.add (alpha, newton_update);
-  }
-  template <int dim>
-  void MinimalSurfaceProblem<dim>::refine_mesh ()
-  {
-    Vector<float> estimated_error_per_cell (triangulation.n_active_cells());
-    KellyErrorEstimator<dim>::estimate (dof_handler,
-                                        QGauss<dim-1>(3),
-                                        typename FunctionMap<dim>::type(),
-                                        present_solution,
-                                        estimated_error_per_cell);
-    GridRefinement::refine_and_coarsen_fixed_number (triangulation,
-                                                     estimated_error_per_cell,
-                                                     0.3, 0.03);
-    triangulation.prepare_coarsening_and_refinement ();
-    SolutionTransfer<dim> solution_transfer(dof_handler);
-    solution_transfer.prepare_for_coarsening_and_refinement(present_solution);
-    triangulation.execute_coarsening_and_refinement();
-    dof_handler.distribute_dofs(fe);
-    Vector<double> tmp(dof_handler.n_dofs());
-    solution_transfer.interpolate(present_solution, tmp);
-    present_solution = tmp;
-    set_boundary_values ();
-    hanging_node_constraints.clear();
-    DoFTools::make_hanging_node_constraints(dof_handler,
-                                            hanging_node_constraints);
-    hanging_node_constraints.close();
-    hanging_node_constraints.distribute (present_solution);
-    setup_system (false);
   }
   template <int dim>
   void MinimalSurfaceProblem<dim>::set_boundary_values ()
@@ -296,7 +301,6 @@ namespace Test
   template <int dim>
   void MinimalSurfaceProblem<dim>::run ()
   {
-    unsigned int refinement = 0;
     bool         first_step = true;
     GridGenerator::hyper_cube (triangulation, -1, 1);
     triangulation.refine_global(3);
