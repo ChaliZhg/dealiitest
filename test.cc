@@ -33,7 +33,7 @@
 //add solver
 #include <deal.II/lac/sparse_direct.h>
  #include <deal.II/lac/solver_gmres.h>
-namespace Step15
+namespace Test
 {
   using namespace dealii;
   template <int dim>
@@ -301,9 +301,9 @@ namespace Step15
     GridGenerator::hyper_ball (triangulation);
     static const HyperBallBoundary<dim> boundary;
     triangulation.set_boundary (0, boundary);
-    triangulation.refine_global(2);
-    double previous_res = 0;
-    while (first_step || (previous_res>1e-3))
+    triangulation.refine_global(3);
+    double previous_res = 1;
+    for (unsigned int inner_iteration=0; (inner_iteration<1000)&&(previous_res>1e-3); ++inner_iteration)
       {
         if (first_step == true)
           {
@@ -313,38 +313,28 @@ namespace Step15
             setup_system (true);
             set_boundary_values ();
           }
-        else
-          {
-            ++refinement;
-            std::cout << "******** Refined mesh " << refinement
-                      << " ********"
-                      << std::endl;
-            refine_mesh();
-          }
-        std::cout << "  Initial residual: "
+        assemble_system ();
+        previous_res = system_rhs.l2_norm();
+        solve ();
+        first_step = false;
+        std::cout << "  Residual: "
                   << compute_residual(0)
                   << std::endl;
-        for (unsigned int inner_iteration=0; inner_iteration<5; ++inner_iteration)
-          {
-            assemble_system ();
-            previous_res = system_rhs.l2_norm();
-            solve ();
-            first_step = false;
-            std::cout << "  Residual: "
-                      << compute_residual(0)
-                      << std::endl;
-          }
-        DataOut<dim> data_out;
-        data_out.attach_dof_handler (dof_handler);
-        data_out.add_data_vector (present_solution, "solution");
-        data_out.add_data_vector (newton_update, "update");
-        data_out.build_patches ();
-        const std::string filename = "solution-" +
-                                     Utilities::int_to_string (refinement, 2) +
-                                     ".vtk";
-        std::ofstream output (filename.c_str());
-        data_out.write_vtk (output);
+        if (inner_iteration%10==0)
+        {
+          DataOut<dim> data_out;
+          data_out.attach_dof_handler (dof_handler);
+          data_out.add_data_vector (present_solution, "solution");
+          data_out.add_data_vector (newton_update, "update");
+          data_out.build_patches ();
+          const std::string filename = "solution-" +
+                                       Utilities::int_to_string (inner_iteration/10, 3) +
+                                       ".vtk";
+          std::ofstream output (filename.c_str());
+          data_out.write_vtk (output);
+        }
       }
+
   }
 }
 int main ()
@@ -352,7 +342,7 @@ int main ()
   try
     {
       using namespace dealii;
-      using namespace Step15;
+      using namespace Test;
       deallog.depth_console (0);
       MinimalSurfaceProblem<2> laplace_problem_2d;
       laplace_problem_2d.run ();

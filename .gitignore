@@ -2,4 +2,6 @@
 *~
 #ignoring cmakefiles folder
 CMakeFiles/
+#ignoring vtk file
+*.vtk
 
