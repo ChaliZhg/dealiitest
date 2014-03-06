@@ -30,6 +30,9 @@
 #include <fstream>
 #include <iostream>
 #include <deal.II/numerics/solution_transfer.h>
+//add solver
+#include <deal.II/lac/sparse_direct.h>
+ #include <deal.II/lac/solver_gmres.h>
 namespace Step15
 {
   using namespace dealii;
