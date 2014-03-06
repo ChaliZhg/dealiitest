@@ -48,7 +48,6 @@ namespace Test
     void assemble_system ();
     void solve ();
     void set_boundary_values ();
-    double compute_residual (const double alpha) const;
     double determine_step_length () const;
     Triangulation<dim>   triangulation;
     DoFHandler<dim>      dof_handler;
@@ -251,57 +250,6 @@ namespace Test
       present_solution(p->first) = p->second;
   }
   template <int dim>
-  double MinimalSurfaceProblem<dim>::compute_residual (const double alpha) const
-  {
-    Vector<double> residual (dof_handler.n_dofs());
-    Vector<double> evaluation_point (dof_handler.n_dofs());
-    evaluation_point = present_solution;
-    evaluation_point.add (alpha, newton_update);
-    const QGauss<dim>  quadrature_formula(3);
-    FEValues<dim> fe_values (fe, quadrature_formula,
-                             update_gradients         |
-                             update_quadrature_points |
-                             update_JxW_values);
-    const unsigned int           dofs_per_cell = fe.dofs_per_cell;
-    const unsigned int           n_q_points    = quadrature_formula.size();
-    Vector<double>               cell_rhs (dofs_per_cell);
-    std::vector<Tensor<1, dim> > gradients(n_q_points);
-    std::vector<types::global_dof_index>    local_dof_indices (dofs_per_cell);
-    typename DoFHandler<dim>::active_cell_iterator
-    cell = dof_handler.begin_active(),
-    endc = dof_handler.end();
-    for (; cell!=endc; ++cell)
-      {
-        cell_rhs = 0;
-        fe_values.reinit (cell);
-        fe_values.get_function_gradients (evaluation_point,
-                                          gradients);
-        for (unsigned int q_point=0; q_point<n_q_points; ++q_point)
-          {
-            const double coeff = 1/std::sqrt(1 +
-                                             gradients[q_point] *
-                                             gradients[q_point]);
-            for (unsigned int i = 0; i < dofs_per_cell; ++i)
-              cell_rhs(i) -= (fe_values.shape_grad(i, q_point)
-                              * coeff
-                              * gradients[q_point]
-                              * fe_values.JxW(q_point));
-          }
-        cell->get_dof_indices (local_dof_indices);
-        for (unsigned int i=0; i<dofs_per_cell; ++i)
-          residual(local_dof_indices[i]) += cell_rhs(i);
-      }
-    hanging_node_constraints.condense (residual);
-    std::vector<bool> boundary_dofs (dof_handler.n_dofs());
-    DoFTools::extract_boundary_dofs (dof_handler,
-                                     ComponentMask(),
-                                     boundary_dofs);
-    for (unsigned int i=0; i<dof_handler.n_dofs(); ++i)
-      if (boundary_dofs[i] == true)
-        residual(i) = 0;
-    return residual.l2_norm();
-  }
-  template <int dim>
   double MinimalSurfaceProblem<dim>::determine_step_length() const
   {
     return 0.1;
@@ -328,7 +276,7 @@ namespace Test
         solve ();
         first_step = false;
         std::cout << "  Residual: "
-                  << compute_residual(0)
+                  << previous_res
                   << std::endl;
         if (inner_iteration%10==0)
         {
