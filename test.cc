@@ -298,9 +298,7 @@ namespace Test
   {
     unsigned int refinement = 0;
     bool         first_step = true;
-    GridGenerator::hyper_ball (triangulation);
-    static const HyperBallBoundary<dim> boundary;
-    triangulation.set_boundary (0, boundary);
+    GridGenerator::hyper_cube (triangulation, -1, 1);
     triangulation.refine_global(3);
     double previous_res = 1;
     for (unsigned int inner_iteration=0; (inner_iteration<1000)&&(previous_res>1e-3); ++inner_iteration)
