@@ -1,0 +1,5 @@
+#ignoring temporary file
+*~
+#ignoring cmakefiles folder
+CMakeFiles/
+
