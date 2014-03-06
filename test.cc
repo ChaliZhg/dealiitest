@@ -73,6 +73,7 @@ namespace Test
                                      const unsigned int /*component*/) const
   {
     return std::sin(2 * numbers::PI * (p[0]+p[1]));
+    //return p[0]+p[1];
   }
     // set right hand side function
   template <int dim>
@@ -130,6 +131,7 @@ namespace Test
     system_matrix = 0;
     system_rhs = 0;
     FEValues<dim> fe_values (fe, quadrature_formula,
+                             update_values            |
                              update_gradients         |
                              update_quadrature_points |
                              update_JxW_values);
@@ -139,6 +141,9 @@ namespace Test
     Vector<double>               cell_rhs (dofs_per_cell);
     std::vector<Tensor<1, dim> > old_solution_gradients(n_q_points);
     std::vector<types::global_dof_index>    local_dof_indices (dofs_per_cell);
+    std::vector<double>          old_solution_values(n_q_points);
+    const RightHandSide<dim>     right_hand_side;
+    std::vector<double>          rhs_values(n_q_points);
     typename DoFHandler<dim>::active_cell_iterator
     cell = dof_handler.begin_active(),
     endc = dof_handler.end();
@@ -149,6 +154,9 @@ namespace Test
         fe_values.reinit (cell);
         fe_values.get_function_gradients(present_solution,
                                          old_solution_gradients);
+        fe_values.get_function_values(present_solution,old_solution_values);
+        right_hand_side.value_list (fe_values.get_quadrature_points(),
+                                        rhs_values);
         for (unsigned int q_point = 0; q_point < n_q_points; ++q_point)
           {
             const double coeff
